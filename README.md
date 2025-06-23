@@ -47,11 +47,23 @@ rn-logs --timeout 10000 --reconnect 2000
 # Max log file lines
 rn-logs --max-lines 500
 
-# Environment variables
-RN_LOGS_PORT=8082 rn-logs
-
 # Help
 rn-logs --help
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RN_LOGS_PORT` | Metro bundler port | `8081` |
+| `RN_LOGS_TIMEOUT` | Connection timeout (ms) | `5000` |
+| `RN_LOGS_RECONNECT` | Reconnection delay (ms) | `3000` |
+| `RN_LOGS_RETRY` | Retry delay (ms) | `5000` |
+| `RN_LOGS_MAX_LINES` | Maximum lines in log file | `100` |
+
+```bash
+# Example usage
+RN_LOGS_PORT=8082 RN_LOGS_TIMEOUT=10000 RN_LOGS_MAX_LINES=200 rn-logs
 ```
 
 ## Log Files
