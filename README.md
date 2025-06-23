@@ -2,7 +2,7 @@
 
 Simple CLI tool for viewing React Native Metro bundler logs in real-time. Start once and forget — automatically reconnects and saves logs to file.
 
-[![npm version](https://badge.fury.io/js/@noma4i/react-native-logs.svg)](https://badge.fury.io/js/@noma4i/react-native-logs)
+[![npm version](https://badge.fury.io/js/react-native-logs.svg)](https://badge.fury.io/js/react-native-logs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![React Native Logs in action](assets/example.png)
@@ -11,7 +11,7 @@ Simple CLI tool for viewing React Native Metro bundler logs in real-time. Start 
 
 - 🚀 Start once, runs continuously with auto-reconnection
 - 🎨 Color-coded log levels with clean output
-- 💾 Saves logs to file automatically  
+- 💾 Saves logs to file automatically
 - 🤖 Clean format perfect for AI debugging
 - ⚙️ Configure via CLI args or environment variables
 
@@ -23,7 +23,7 @@ npm install -g @noma4i/react-native-logs
 # or
 yarn global add @noma4i/react-native-logs
 
-# Use without installing  
+# Use without installing
 npx @noma4i/react-native-logs
 # or
 yarn dlx @noma4i/react-native-logs
@@ -41,7 +41,7 @@ rn-logs
 # Custom Metro port
 rn-logs --port 8082
 
-# Timeout and reconnect settings  
+# Timeout and reconnect settings
 rn-logs --timeout 10000 --reconnect 2000
 
 # Max log file lines
