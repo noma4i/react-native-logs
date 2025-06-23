@@ -1,0 +1,422 @@
+#!/usr/bin/env node
+
+const http = require('http');
+const WebSocket = require('ws');
+const fs = require('fs');
+const path = require('path');
+
+// Parse CLI arguments
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const config = {};
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const nextArg = args[i + 1];
+    
+    switch (arg) {
+      case '--port':
+      case '-p':
+        config.METRO_PORT = parseInt(nextArg) || 8081;
+        i++;
+        break;
+      case '--timeout':
+      case '-t':
+        config.REQUEST_TIMEOUT = parseInt(nextArg) || 5000;
+        i++;
+        break;
+      case '--reconnect':
+      case '-r':
+        config.RECONNECT_DELAY = parseInt(nextArg) || 3000;
+        i++;
+        break;
+      case '--retry':
+        config.RETRY_DELAY = parseInt(nextArg) || 5000;
+        i++;
+        break;
+      case '--max-lines':
+      case '-m':
+        config.MAX_LINES = parseInt(nextArg) || 100;
+        i++;
+        break;
+      case '--help':
+      case '-h':
+        showHelp();
+        process.exit(0);
+        break;
+      case '--version':
+      case '-v':
+        showVersion();
+        process.exit(0);
+        break;
+    }
+  }
+  
+  return config;
+}
+
+function showHelp() {
+  console.log(`
+React Native Log Viewer
+
+Usage: rn-logs [options]
+
+Options:
+  -p, --port <port>        Metro bundler port (default: 8081)
+  -t, --timeout <ms>       Request timeout in milliseconds (default: 5000)
+  -r, --reconnect <ms>     Reconnection delay in milliseconds (default: 3000)
+  --retry <ms>             Retry delay in milliseconds (default: 5000)
+  -m, --max-lines <count>  Maximum lines in log file (default: 100)
+  -h, --help               Show this help message
+  -v, --version            Show version
+
+Environment Variables:
+  RN_LOGS_PORT             Metro bundler port
+  RN_LOGS_TIMEOUT          Request timeout in milliseconds
+  RN_LOGS_RECONNECT        Reconnection delay in milliseconds
+  RN_LOGS_RETRY            Retry delay in milliseconds
+  RN_LOGS_MAX_LINES        Maximum lines in log file
+
+Examples:
+  rn-logs                  Start with default settings
+  rn-logs -p 8082          Use port 8082
+  rn-logs -t 10000 -r 2000 Custom timeout and reconnect delay
+  RN_LOGS_PORT=8082 rn-logs Use environment variable
+`);
+}
+
+function showVersion() {
+  const packageJson = require('../package.json');
+  console.log(packageJson.version);
+}
+
+// Get configuration from ENV and CLI args
+function getConfig() {
+  const envConfig = {
+    METRO_PORT: parseInt(process.env.RN_LOGS_PORT) || 8081,
+    REQUEST_TIMEOUT: parseInt(process.env.RN_LOGS_TIMEOUT) || 5000,
+    RECONNECT_DELAY: parseInt(process.env.RN_LOGS_RECONNECT) || 3000,
+    RETRY_DELAY: parseInt(process.env.RN_LOGS_RETRY) || 5000,
+    MAX_LINES: parseInt(process.env.RN_LOGS_MAX_LINES) || 100
+  };
+  
+  const cliConfig = parseArgs();
+  
+  return { ...envConfig, ...cliConfig };
+}
+
+const COLORS = {
+    LOG: '\x1b[37m',
+    INFO: '\x1b[36m',
+    WARN: '\x1b[33m',
+    ERROR: '\x1b[31m',
+    DEBUG: '\x1b[35m',
+    WARNING: '\x1b[33m',
+    VERBOSE: '\x1b[90m',
+    RESET: '\x1b[0m'
+};
+
+const EMOJIS = {
+    CONNECTED: '✅',
+    LISTENING: '📱',
+    DISCONNECTED: '🔌',
+    RECONNECTING: '🔄',
+    FAILED: '❌',
+    STARTING: '🚀',
+    GOODBYE: '👋'
+};
+
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+class ReactNativeLogViewer {
+    constructor(config) {
+        this.config = config;
+        this.logBuffer = [];
+        this.spinnerIndex = 0;
+        this.spinnerInterval = null;
+        this.isReconnecting = false;
+        this.ws = null;
+        
+        this.setupLogDirectory();
+    }
+
+    setupLogDirectory() {
+        const logDir = path.join(process.cwd(), 'logs');
+        const logFile = path.join(logDir, 'metro.log');
+        
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+        }
+        
+        this.logFile = logFile;
+    }
+
+    async getDebuggerUrl() {
+        return new Promise((resolve, reject) => {
+            const req = http.get(`http://localhost:${this.config.METRO_PORT}/json`, (res) => {
+                let data = '';
+
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+
+                res.on('end', () => {
+                    try {
+                        const targets = JSON.parse(data);
+                        const rnTarget = this.findReactNativeTarget(targets);
+
+                        if (rnTarget?.webSocketDebuggerUrl) {
+                            resolve(rnTarget.webSocketDebuggerUrl);
+                        } else if (targets[0]?.webSocketDebuggerUrl) {
+                            resolve(targets[0].webSocketDebuggerUrl);
+                        } else {
+                            reject(new Error('No WebSocket debugger URL found'));
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            });
+
+            req.on('error', reject);
+            req.setTimeout(this.config.REQUEST_TIMEOUT, () => {
+                req.destroy();
+                reject(new Error('Request timeout'));
+            });
+        });
+    }
+
+    findReactNativeTarget(targets) {
+        return targets.find(target =>
+            target.title?.includes('React Native') ||
+            target.description?.includes('React Native') ||
+            target.url?.includes('ReactNative')
+        );
+    }
+
+    cleanStackTrace(text) {
+        if (typeof text !== 'string') return text;
+
+        const lines = text.split('\n');
+        const cleanLines = lines.filter(line => !line.includes('index.bundle'));
+        return cleanLines.join('\n').trim();
+    }
+
+    formatLogMessage(args) {
+        return args.map(arg => {
+            if (arg.type === 'string') {
+                return this.cleanStackTrace(arg.value);
+            } else if (arg.type === 'object') {
+                if (arg.subtype === 'error' && arg.description) {
+                    return this.cleanStackTrace(arg.description);
+                }
+
+                if (arg.value) {
+                    if (arg.value.message && arg.value.stack) {
+                        return this.cleanStackTrace(arg.value.message);
+                    }
+                    const jsonStr = JSON.stringify(arg.value, null, 2);
+                    return this.cleanStackTrace(jsonStr);
+                } else if (arg.preview) {
+                    if (arg.preview.properties) {
+                        const messageProperty = arg.preview.properties.find(p => p.name === 'message');
+                        if (messageProperty) {
+                            return this.cleanStackTrace(messageProperty.value);
+                        }
+                        const props = arg.preview.properties.map(p => `${p.name}: ${this.cleanStackTrace(p.value)}`).join(', ');
+                        return `{${props}}`;
+                    }
+                    const desc = arg.preview.description || arg.description || '[Object]';
+                    return this.cleanStackTrace(desc);
+                }
+                const desc = arg.description || '[Object]';
+                return this.cleanStackTrace(desc);
+            } else if (arg.type === 'number' || arg.type === 'boolean') {
+                return String(arg.value);
+            } else {
+                const val = arg.value || arg.description || `[${arg.type}]`;
+                return this.cleanStackTrace(val);
+            }
+        }).join(' ');
+    }
+
+    getTimestamp() {
+        return new Date().toLocaleTimeString();
+    }
+
+    writeToFile(message) {
+        const plainMessage = message.replace(/\x1b\[[0-9;]*m/g, '');
+
+        this.logBuffer.push(plainMessage);
+
+        if (this.logBuffer.length > this.config.MAX_LINES) {
+            this.logBuffer = this.logBuffer.slice(-this.config.MAX_LINES);
+        }
+
+        fs.writeFileSync(this.logFile, this.logBuffer.join('\n'));
+    }
+
+    logWithColor(color, timestamp, level, message) {
+        const formattedMessage = `${color}[${timestamp}] [${level}]${COLORS.RESET} ${message}`;
+        console.log(formattedMessage);
+        this.writeToFile(`[${timestamp}] [${level}] ${message}`);
+    }
+
+    handleConsoleAPI(msg) {
+        const timestamp = this.getTimestamp();
+        const type = msg.params.type.toUpperCase();
+        const args = this.formatLogMessage(msg.params.args);
+        const color = COLORS[type] || COLORS.LOG;
+
+        this.logWithColor(color, timestamp, type, args);
+    }
+
+    handleLogEntry(msg) {
+        const timestamp = this.getTimestamp();
+        const level = msg.params.entry.level.toUpperCase();
+        const text = msg.params.entry.text;
+        const color = COLORS[level] || COLORS.LOG;
+
+        this.logWithColor(color, timestamp, level, text);
+    }
+
+    handleException(msg) {
+        const timestamp = this.getTimestamp();
+        const error = msg.params.exceptionDetails;
+        const errorText = error.exception ? error.exception.description : error.text;
+
+        const cleanError = errorText.split('\n')[0];
+        this.logWithColor(COLORS.ERROR, timestamp, 'EXCEPTION', cleanError);
+    }
+
+    handleMessage(data) {
+        try {
+            const msg = JSON.parse(data);
+
+            switch (msg.method) {
+                case 'Runtime.consoleAPICalled':
+                    this.handleConsoleAPI(msg);
+                    break;
+                case 'Log.entryAdded':
+                    this.handleLogEntry(msg);
+                    break;
+                case 'Runtime.exceptionThrown':
+                    this.handleException(msg);
+                    break;
+            }
+        } catch (parseError) {
+            console.error('Error parsing message:', parseError);
+        }
+    }
+
+    enableDebuggingAPIs(ws) {
+        const apis = [
+            { id: 1, method: 'Runtime.enable' },
+            { id: 2, method: 'Log.enable' },
+            { id: 3, method: 'Console.enable' }
+        ];
+
+        apis.forEach(api => {
+            ws.send(JSON.stringify(api));
+        });
+    }
+
+    startSpinner(baseMessage) {
+        this.stopSpinner();
+        this.spinnerInterval = setInterval(() => {
+            const spinner = SPINNER_FRAMES[this.spinnerIndex % SPINNER_FRAMES.length];
+            process.stdout.write('\r' + ' '.repeat(100) + '\r');
+            process.stdout.write(`${spinner} ${baseMessage}`);
+            this.spinnerIndex++;
+        }, 100);
+        this.isReconnecting = true;
+    }
+
+    stopSpinner() {
+        if (this.spinnerInterval) {
+            clearInterval(this.spinnerInterval);
+            this.spinnerInterval = null;
+        }
+    }
+
+    clearStatusLine() {
+        this.stopSpinner();
+        if (this.isReconnecting) {
+            process.stdout.write('\r' + ' '.repeat(100) + '\r');
+            this.isReconnecting = false;
+        }
+    }
+
+    async connectToDebugger() {
+        try {
+            this.startSpinner(`Connecting to Metro bundler (localhost:${this.config.METRO_PORT})...`);
+            const wsUrl = await this.getDebuggerUrl();
+            this.clearStatusLine();
+            console.log(`${EMOJIS.CONNECTED} Connected to React Native debugger`);
+
+            this.ws = new WebSocket(wsUrl);
+
+            this.ws.on('open', () => {
+                this.clearStatusLine();
+                console.log(`${EMOJIS.LISTENING} Listening for console logs...\n`);
+                this.enableDebuggingAPIs(this.ws);
+            });
+
+            this.ws.on('message', (data) => this.handleMessage(data));
+
+            this.ws.on('error', (error) => {
+                this.clearStatusLine();
+                console.error(`${EMOJIS.FAILED} WebSocket error: ${error.message}`);
+            });
+
+            this.ws.on('close', (code, reason) => {
+                this.clearStatusLine();
+                console.log(`${EMOJIS.DISCONNECTED} Connection closed (${code}): ${reason || 'unknown reason'}`);
+
+                setTimeout(() => {
+                    this.startSpinner('Reconnecting...');
+                    this.connectToDebugger();
+                }, this.config.RECONNECT_DELAY);
+            });
+
+        } catch (error) {
+            if (!this.isReconnecting) {
+                const errorMsg = error.message.includes('ECONNREFUSED')
+                    ? 'Metro bundler unavailable. Run yarn start'
+                    : error.message;
+
+                console.log(`${EMOJIS.FAILED} ${errorMsg}`);
+            }
+
+            setTimeout(() => {
+                this.startSpinner('Retrying connection...');
+                this.connectToDebugger();
+            }, this.config.RETRY_DELAY);
+        }
+    }
+
+    setupGracefulShutdown() {
+        process.on('SIGINT', () => {
+            this.clearStatusLine();
+            console.log(`\n${EMOJIS.GOODBYE} Disconnecting...`);
+            if (this.ws) {
+                this.ws.close();
+            }
+            process.exit(0);
+        });
+    }
+
+    start() {
+        console.log(`${EMOJIS.STARTING} Starting React Native Log Viewer...`);
+        console.log(`Port: ${this.config.METRO_PORT}`);
+        console.log(`Log file: ${this.logFile}\n`);
+        
+        this.setupGracefulShutdown();
+        this.connectToDebugger();
+    }
+}
+
+// Main execution
+const config = getConfig();
+const logViewer = new ReactNativeLogViewer(config);
+logViewer.start();

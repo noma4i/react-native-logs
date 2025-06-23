@@ -1,0 +1,58 @@
+{
+  "name": "react-native-logs",
+  "version": "1.0.0",
+  "description": "Simple CLI utility for viewing React Native Metro bundler logs in real-time",
+  "bin": {
+    "rn-logs": "./bin/rn-logs",
+    "react-native-logs": "./bin/rn-logs"
+  },
+  "scripts": {
+    "dev": "node bin/rn-logs",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "prepublishOnly": "npm run lint",
+    "version": "npm run format && git add -A src",
+    "postversion": "git push && git push --tags",
+    "release:patch": "npm version patch && npm publish",
+    "release:minor": "npm version minor && npm publish",
+    "release:major": "npm version major && npm publish"
+  },
+  "keywords": [
+    "react-native",
+    "logging",
+    "debug",
+    "console",
+    "metro",
+    "cli",
+    "utility",
+    "websocket",
+    "debugger"
+  ],
+  "author": "noma4i <email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noma4i/react-native-logs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/noma4i/react-native-logs/issues"
+  },
+  "homepage": "https://github.com/noma4i/react-native-logs#readme",
+  "dependencies": {
+    "ws": "^8.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.60.0"
+  },
+  "files": [
+    "bin/",
+    "assets/",
+    "README.md"
+  ]
+}
