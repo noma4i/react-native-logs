@@ -2,6 +2,8 @@
 
 Simple CLI tool for viewing React Native Metro bundler logs in real-time. Start once and forget — automatically reconnects and saves logs to file.
 
+React Native moved JavaScript logs to DevTools in browser, but sometimes you want terminal logs back. This tool brings console logs back to your terminal and saves them to file.
+
 [![npm version](https://badge.fury.io/js/react-native-logs.svg)](https://badge.fury.io/js/react-native-logs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
