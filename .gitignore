@@ -37,4 +37,7 @@ coverage/
 # Temporary files
 .tmp/
 .temp/
+
+# NPM configuration (contains auth tokens)
 .npmrc
+cat
