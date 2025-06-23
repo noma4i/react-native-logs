@@ -1,6 +1,6 @@
 {
   "name": "react-native-logs",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Simple CLI utility for viewing React Native Metro bundler logs in real-time",
   "bin": {
     "rn-logs": "./bin/rn-logs",
