@@ -2,22 +2,17 @@ module.exports = {
   root: true,
   env: {
     es6: true,
-    node: true
+    node: true,
   },
-  extends: [
-    'eslint:recommended',
-    'prettier'
-  ],
+  extends: ['eslint:recommended', 'prettier'],
   parserOptions: {
     ecmaVersion: 2018,
-    sourceType: 'script'
+    sourceType: 'script',
   },
-  plugins: [
-    'prettier'
-  ],
+  plugins: ['prettier'],
   rules: {
     'prettier/prettier': 'error',
     'no-console': 'off',
-    'no-unused-vars': 'error'
-  }
+    'no-unused-vars': 'error',
+  },
 };

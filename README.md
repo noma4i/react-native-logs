@@ -85,28 +85,27 @@ rn-logs -p 8082 -t 10000 -r 2000 --max-lines 1000
 
 ### CLI Arguments
 
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--port` | `-p` | Metro bundler port | `8081` |
-| `--timeout` | `-t` | Connection timeout (ms) | `5000` |
-| `--reconnect` | `-r` | Reconnection delay (ms) | `3000` |
-| `--retry` | | Retry delay after failure (ms) | `5000` |
-| `--max-lines` | `-m` | Log file line limit | `100` |
-| `--help` | `-h` | Show help information | |
-| `--version` | `-v` | Display version | |
+| Option        | Short | Description                    | Default |
+| ------------- | ----- | ------------------------------ | ------- |
+| `--port`      | `-p`  | Metro bundler port             | `8081`  |
+| `--timeout`   | `-t`  | Connection timeout (ms)        | `5000`  |
+| `--reconnect` | `-r`  | Reconnection delay (ms)        | `3000`  |
+| `--retry`     |       | Retry delay after failure (ms) | `5000`  |
+| `--max-lines` | `-m`  | Log file line limit            | `100`   |
+| `--help`      | `-h`  | Show help information          |         |
+| `--version`   | `-v`  | Display version                |         |
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `RN_LOGS_PORT` | Metro bundler port | `8081` |
-| `RN_LOGS_TIMEOUT` | Connection timeout (ms) | `5000` |
-| `RN_LOGS_RECONNECT` | Reconnection delay (ms) | `3000` |
-| `RN_LOGS_RETRY` | Retry delay (ms) | `5000` |
-| `RN_LOGS_MAX_LINES` | Log file line limit | `100` |
+| Variable            | Description             | Default |
+| ------------------- | ----------------------- | ------- |
+| `RN_LOGS_PORT`      | Metro bundler port      | `8081`  |
+| `RN_LOGS_TIMEOUT`   | Connection timeout (ms) | `5000`  |
+| `RN_LOGS_RECONNECT` | Reconnection delay (ms) | `3000`  |
+| `RN_LOGS_RETRY`     | Retry delay (ms)        | `5000`  |
+| `RN_LOGS_MAX_LINES` | Log file line limit     | `100`   |
 
 ## Integration Workflows
-
 
 ### Log Files
 
